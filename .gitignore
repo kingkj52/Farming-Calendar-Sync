@@ -1,0 +1,22 @@
+# Gradle
+build/
+.gradle/
+
+# Build-time tool that reads RuneLite's own classes; kept locally, not part of the plugin
+tools/
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local notes and secrets, in case any land here
+*.local
+.env

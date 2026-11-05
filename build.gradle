@@ -1,0 +1,97 @@
+plugins {
+	id 'java'
+}
+
+repositories {
+	mavenLocal()
+	maven {
+		url = 'https://repo.runelite.net'
+		content {
+			includeGroupByRegex("net[.]runelite.*")
+		}
+	}
+	mavenCentral()
+}
+
+def runeLiteVersion = 'latest.release'
+
+// Build-time only: a tiny tool that sits in RuneLite's own package so it can read the
+// time tracker's patch table, and writes it out as JSON. Nothing from it ships in the jar.
+sourceSets {
+	gen {
+		java.srcDir 'tools/gen'
+	}
+}
+
+dependencies {
+	compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+
+	compileOnly 'org.projectlombok:lombok:1.18.30'
+	annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+	testImplementation 'junit:junit:4.13.2'
+	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+
+	genImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+}
+
+group = 'com.farmingcalendar'
+version = '0.1.0'
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	options.release.set(11)
+	options.compilerArgs << '-Xlint:deprecation'
+}
+
+test {
+	systemProperty 'java.awt.headless', 'true'
+	testLogging {
+		events 'passed', 'failed'
+		exceptionFormat = 'full'
+	}
+}
+
+jar {
+	archiveBaseName = 'farming-calendar-sync'
+}
+
+// Regenerates src/main/resources/com/farmingcalendar/farming-data.json from the time tracker
+// in the RuneLite client this build resolves. Run it after a RuneLite update that adds patches or crops.
+// The client jar is signed, and the JVM refuses to load a class into a signed package from an
+// unsigned directory, so the tool runs against a copy of the client with its signature files removed.
+tasks.register('unsignedClient', Zip) {
+	archiveFileName = 'client-unsigned.jar'
+	destinationDirectory = layout.buildDirectory.dir('gen')
+	from({
+		zipTree(configurations.genRuntimeClasspath.files.find { it.name.startsWith('client-') })
+	}) {
+		exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA', 'META-INF/*.EC'
+	}
+}
+
+tasks.register('dumpFarming', JavaExec) {
+	dependsOn tasks.unsignedClient
+	classpath = files(tasks.unsignedClient.archiveFile) + sourceSets.gen.output +
+		configurations.genRuntimeClasspath.filter { !it.name.startsWith('client-') }
+	mainClass = 'net.runelite.client.plugins.timetracking.farming.DumpFarming'
+	args file('src/main/resources/com/farmingcalendar/farming-data.json').absolutePath
+}
+
+// Copies the built jar into the sideloaded-plugins folder, clearing out older
+// builds of this plugin first so two versions can never load side by side.
+tasks.register('deploy', Copy) {
+	dependsOn tasks.jar
+	def target = file("${System.getProperty('user.home')}/.runelite/sideloaded-plugins")
+	doFirst {
+		target.mkdirs()
+		target.listFiles()?.each { f ->
+			if (f.name.startsWith('farming-calendar-sync'))
+			{
+				delete f
+			}
+		}
+	}
+	from tasks.jar
+	into target
+}
