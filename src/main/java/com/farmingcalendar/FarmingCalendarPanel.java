@@ -8,9 +8,12 @@ import com.farmingcalendar.core.Planner.Toggle;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.LayoutManager;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -30,7 +33,9 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JSpinner;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.UIManager;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -61,7 +66,7 @@ class FarmingCalendarPanel extends PluginPanel
 	private final FarmingData data;
 	private final Store store;
 
-	private final JLabel status = new JLabel();
+	private final JTextArea status = paragraph(Color.LIGHT_GRAY);
 	private final Map<String, Row> rows = new LinkedHashMap<>();
 	private final List<Group> groups = new ArrayList<>();
 	private final JTextField search = new JTextField();
@@ -89,13 +94,21 @@ class FarmingCalendarPanel extends PluginPanel
 		this.plugin = plugin;
 		this.data = data;
 		this.store = plugin.store();
+		// RuneLite's own stacking layout scales every child by the widest one, which squeezed everything here.
+		// This one gives every child exactly the panel's width.
+		setLayout(new FillWidthLayout(3));
 
 		JLabel title = new JLabel("Farming Calendar Sync");
 		title.setForeground(Color.WHITE);
 		add(title);
 
-		status.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		add(status);
+
+		JTextArea warning = paragraph(ColorScheme.LIGHT_GRAY_COLOR);
+		warning.setText("Data sent: the names and ready times of the patches you switch on, to the web app address "
+			+ "you enter in Settings (your own Google script). Nothing else, to no one else, and nothing at all until "
+			+ "an address is entered.");
+		add(warning);
 
 		JPanel buttons = new JPanel(new GridLayout(0, 1, 0, 3));
 		buttons.setOpaque(false);
@@ -191,6 +204,77 @@ class FarmingCalendarPanel extends PluginPanel
 		refresh();
 	}
 
+	/** Stacks children top to bottom, each exactly as wide as the container and as tall as it prefers. */
+	private static final class FillWidthLayout implements LayoutManager
+	{
+		private final int gap;
+
+		FillWidthLayout(int gap)
+		{
+			this.gap = gap;
+		}
+
+		@Override
+		public void addLayoutComponent(String name, Component comp)
+		{
+		}
+
+		@Override
+		public void removeLayoutComponent(Component comp)
+		{
+		}
+
+		@Override
+		public Dimension preferredLayoutSize(Container parent)
+		{
+			Insets in = parent.getInsets();
+			int h = in.top + in.bottom;
+			int shown = 0;
+			int width = (parent.getWidth() > 0 ? parent.getWidth() : PluginPanel.PANEL_WIDTH) - in.left - in.right;
+			for (Component c : parent.getComponents())
+			{
+				if (c.isVisible())
+				{
+					h += heightAt(c, width) + (shown++ > 0 ? gap : 0);
+				}
+			}
+			return new Dimension(PluginPanel.PANEL_WIDTH, h);
+		}
+
+		/** Wrapped text is as tall as it needs to be at the width it is given. */
+		private static int heightAt(Component c, int width)
+		{
+			if (c instanceof JTextArea)
+			{
+				c.setSize(width, 1);
+			}
+			return c.getPreferredSize().height;
+		}
+
+		@Override
+		public Dimension minimumLayoutSize(Container parent)
+		{
+			return preferredLayoutSize(parent);
+		}
+
+		@Override
+		public void layoutContainer(Container parent)
+		{
+			Insets in = parent.getInsets();
+			int width = parent.getWidth() - in.left - in.right;
+			int y = in.top;
+			for (Component c : parent.getComponents())
+			{
+				if (c.isVisible())
+				{
+					int h = heightAt(c, width);
+					c.setBounds(in.left, y, width, h);
+					y += h + gap;
+				}
+			}
+		}
+	}
+
 	// ---- building blocks
 
 	private static JButton button(String text, String tip, Runnable action)
@@ -200,6 +284,21 @@ class FarmingCalendarPanel extends PluginPanel
 		b.setFocusable(false);
 		b.addActionListener(e -> action.run());
 		return b;
+	}
+
+	/** A read-only block of text that wraps to whatever width the layout gives it. */
+	private static JTextArea paragraph(Color color)
+	{
+		JTextArea t = new JTextArea();
+		t.setLineWrap(true);
+		t.setWrapStyleWord(true);
+		t.setEditable(false);
+		t.setFocusable(false);
+		t.setOpaque(false);
+		t.setBorder(null);
+		t.setFont(UIManager.getFont("Label.font"));
+		t.setForeground(color);
+		return t;
 	}
 
 	/** Wraps text to a fixed width so it can never run past the edge of the side panel. */
@@ -238,12 +337,6 @@ class FarmingCalendarPanel extends PluginPanel
 		body.setOpaque(false);
 		body.setBorder(BorderFactory.createEmptyBorder(4, 6, 6, 6));
 
-		JLabel warning = new JLabel("<html><div style='width:185px'>Data sent: the names and ready times of the patches "
-			+ "you switch on, to the web app address below, which is your own Google script. Nothing else, to no one else, "
-			+ "and nothing at all until an address is entered.</div></html>");
-		warning.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		warning.setAlignmentX(Component.LEFT_ALIGNMENT);
-		body.add(warning);
 
 		url.setToolTipText("The https://script.google.com/.../exec link from Deploy > Manage deployments");
 		token.setToolTipText("The same secret you put in the script");
@@ -681,11 +774,7 @@ class FarmingCalendarPanel extends PluginPanel
 
 	void showStatus(String text)
 	{
-		status.setText("<html><div style='width:195px'>" + escape(text) + "</div></html>");
-	}
-
-	private static String escape(String s)
-	{
-		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+		status.setText(text);
+		revalidate();
 	}
 }
