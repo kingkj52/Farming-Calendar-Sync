@@ -50,11 +50,11 @@ class FarmingCalendarPanel extends PluginPanel
 	private static final String GUIDE = "https://github.com/kingkj52/farming-calendar-sync/blob/main/SETUP.md";
 	private static final String[] QUICK = {
 		"Quick select...",
-		"My usual: trees, fruit trees, hardwood, calquat, Hespori, contract",
-		"Everything on the calendar",
-		"Alerts on for everything on the calendar",
-		"Alerts off for everything",
-		"Nothing on the calendar"
+		"My usual (trees, hardwood...)",
+		"Everything on calendar",
+		"Alerts on for all on calendar",
+		"Alerts off for all",
+		"Nothing on calendar"
 	};
 
 	private final FarmingCalendarPlugin plugin;
@@ -72,16 +72,16 @@ class FarmingCalendarPanel extends PluginPanel
 	private final JPasswordField token = new JPasswordField();
 	private final JTextField calendarName = new JTextField();
 	private final JTextField reminders = new JTextField();
-	private final JCheckBox popup = new JCheckBox("Phone / app alert");
-	private final JCheckBox email = new JCheckBox("Email");
+	private final JCheckBox popup = new JCheckBox(wrap("Phone / app alert"));
+	private final JCheckBox email = new JCheckBox(wrap("Email"));
 	private final JSpinner length = new JSpinner(new SpinnerNumberModel(15, 1, 1440, 5));
 	private final JComboBox<String> autoClear = new JComboBox<>(new String[] {
-		"Once checked or harvested", "Never (replanting replaces)"});
+		"Once checked or harvested", "Never"});
 	private final JSpinner deleteAfter = new JSpinner(new SpinnerNumberModel(0, 0, 10000, 1));
-	private final JCheckBox regrow = new JCheckBox("Alert when fruit regrows");
-	private final JCheckBox notifyDefault = new JCheckBox("New patches alert by default");
-	private final JCheckBox showAccount = new JCheckBox("Account name in titles");
-	private final JCheckBox enabled = new JCheckBox("Syncing on");
+	private final JCheckBox regrow = new JCheckBox(wrap("Alert when fruit regrows"));
+	private final JCheckBox notifyDefault = new JCheckBox(wrap("New patches alert by default"));
+	private final JCheckBox showAccount = new JCheckBox(wrap("Account name in titles"));
+	private final JCheckBox enabled = new JCheckBox(wrap("Syncing on"));
 
 	FarmingCalendarPanel(FarmingCalendarPlugin plugin, FarmingData data)
 	{
@@ -123,6 +123,8 @@ class FarmingCalendarPanel extends PluginPanel
 		});
 		add(quick);
 
+		quick.setMinimumSize(new Dimension(0, 24));
+		quick.setPrototypeDisplayValue("Alerts on for all on calendar");
 		search.setToolTipText("Filter patches by place or type");
 		search.getDocument().addDocumentListener(new DocumentListener()
 		{
@@ -200,6 +202,12 @@ class FarmingCalendarPanel extends PluginPanel
 		return b;
 	}
 
+	/** Wraps text to a fixed width so it can never run past the edge of the side panel. */
+	private static String wrap(String text)
+	{
+		return "<html><div style='width:150px'>" + text + "</div></html>";
+	}
+
 	private static JLabel small(String text)
 	{
 		JLabel l = new JLabel(text);
@@ -251,6 +259,8 @@ class FarmingCalendarPanel extends PluginPanel
 		body.add(popup);
 		body.add(email);
 		addField(body, "Entry length (minutes)", length);
+		autoClear.setMinimumSize(new Dimension(0, 24));
+		autoClear.setPrototypeDisplayValue("Once checked or harvested");
 		addField(body, "Remove entries", autoClear);
 		addField(body, "Also remove after (hours)", deleteAfter);
 		body.add(regrow);
@@ -277,7 +287,7 @@ class FarmingCalendarPanel extends PluginPanel
 
 	private static void addField(JPanel body, String label, JComponent field)
 	{
-		JLabel l = small(label);
+		JLabel l = small(wrap(label));
 		l.setAlignmentX(Component.LEFT_ALIGNMENT);
 		field.setAlignmentX(Component.LEFT_ALIGNMENT);
 		field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
